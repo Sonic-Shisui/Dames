@@ -5,21 +5,29 @@ const port = 3000;
 
 app.use(express.json());
 
-// 📁 Création dossier de sauvegarde
+// 📁 Création dossier de sauvegarde (utile seulement en local)
 const SAVE_DIR = './saves';
 if (!fs.existsSync(SAVE_DIR)) fs.mkdirSync(SAVE_DIR);
 
-// 📦 Sauvegarde automatique
+// 📦 Sauvegarde automatique (fichiers locaux, si serveur persistant)
 const GAME_FILE = `${SAVE_DIR}/games.json`;
 const PLAYER_FILE = `${SAVE_DIR}/players.json`;
 
 function saveToFile(filename, data) {
-  fs.writeFileSync(filename, JSON.stringify(data, null, 2));
+  try {
+    fs.writeFileSync(filename, JSON.stringify(data, null, 2));
+  } catch (err) {
+    console.warn("⚠️ Impossible de sauvegarder localement sur Vercel (stateless).");
+  }
 }
 
 function loadFromFile(filename) {
-  if (!fs.existsSync(filename)) return {};
-  return JSON.parse(fs.readFileSync(filename));
+  try {
+    if (!fs.existsSync(filename)) return {};
+    return JSON.parse(fs.readFileSync(filename));
+  } catch {
+    return {};
+  }
 }
 
 // 🧠 Données persistantes
@@ -151,7 +159,22 @@ app.get('/games', (req, res) => {
   res.json(list);
 });
 
+// 💾 Exporter toutes les données (sauvegarde cloud)
+app.get('/save', (req, res) => {
+  res.json({ games, playerStats, lastUpdate: new Date().toISOString() });
+});
+
+// 🔄 Restaurer données depuis le bot
+app.post('/load', (req, res) => {
+  const { games: g, playerStats: p } = req.body;
+  if (g) games = g;
+  if (p) playerStats = p;
+  saveToFile(GAME_FILE, games);
+  saveToFile(PLAYER_FILE, playerStats);
+  res.json({ message: "Données restaurées avec succès." });
+});
+
 // 🔥 Lancer serveur
 app.listen(port, () => {
-  console.log(`📡 API de dames sauvegardée en ligne sur http://localhost:${port}`);
+  console.log(`📡 API de dames active sur http://localhost:${port}`);
 });
